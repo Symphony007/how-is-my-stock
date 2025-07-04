@@ -9,10 +9,11 @@ requests
 yfinance
 pandas
 numpy
-bs4
+beautifulsoup4
 newsapi-python
 transformers
 torch
 nsepython
 feedparser
 werkzeug
+gunicorn
