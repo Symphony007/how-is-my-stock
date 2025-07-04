@@ -81,30 +81,6 @@ Install the dependencies:
 pip install -r requirements.txt
 ```
 
-Contents of `requirements.txt`:
-
-```
-flask
-flask_sqlalchemy
-flask_cors
-flask_caching
-flask_migrate
-flask_wtf
-python-dotenv
-requests
-yfinance
-pandas
-numpy
-bs4
-newsapi-python
-transformers
-torch
-nsepython
-feedparser
-werkzeug
-```
----
-
 ## 🚀 Getting Started (Local Setup)
 
 ```bash
