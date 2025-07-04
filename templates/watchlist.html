@@ -1,0 +1,238 @@
+{% extends "layout.html" %}
+
+{% block title %}My Watchlist{% endblock %}
+
+{% block styles %}
+  {{ super() }}
+  <style>
+    .watchlist-container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+    .watchlist-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 30px;
+    }
+    .watchlist-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+      gap: 20px;
+    }
+    .watchlist-card {
+      background: rgba(15, 15, 30, 0.7);
+      border-radius: 10px;
+      padding: 20px;
+      border: 1px solid #a78bfa33;
+      transition: all 0.3s ease;
+      backdrop-filter: blur(5px);
+    }
+    .watchlist-card:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 10px 20px rgba(167, 139, 250, 0.2);
+      border-color: #a78bfa;
+    }
+    .watchlist-stock-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 15px;
+    }
+    .watchlist-stock-name {
+      font-size: 1.3rem;
+      color: #a78bfa;
+      margin: 0;
+      font-family: 'Orbitron', sans-serif;
+    }
+    .watchlist-stock-symbol {
+      background: rgba(167, 139, 250, 0.2);
+      padding: 3px 10px;
+      border-radius: 15px;
+      font-size: 0.9rem;
+      font-family: 'Orbitron', sans-serif;
+      letter-spacing: 1px;
+    }
+    .watchlist-stock-price {
+      font-size: 1.8rem;
+      font-weight: bold;
+      margin: 10px 0;
+      font-family: 'Rajdhani', sans-serif;
+    }
+    .watchlist-stock-meta {
+      display: flex;
+      justify-content: space-between;
+      color: #c4b5fd;
+      font-size: 0.9rem;
+      margin-bottom: 15px;
+    }
+    .watchlist-actions {
+      margin-top: 15px;
+      display: flex;
+      gap: 10px;
+    }
+    .empty-watchlist {
+      text-align: center;
+      padding: 50px;
+      color: #a78bfa;
+      background: rgba(15, 15, 30, 0.7);
+      border-radius: 15px;
+      border: 1px dashed #a78bfa33;
+    }
+    .empty-watchlist i {
+      font-size: 3rem;
+      margin-bottom: 20px;
+      opacity: 0.7;
+    }
+    .empty-watchlist h3 {
+      font-family: 'Orbitron', sans-serif;
+      margin-bottom: 10px;
+    }
+    .empty-watchlist p {
+      margin-bottom: 20px;
+      color: #c4b5fd;
+    }
+  </style>
+{% endblock %}
+
+{% block content %}
+<div class="watchlist-container">
+  <div class="watchlist-header">
+    <h1><i class="fas fa-bookmark"></i> My Watchlist</h1>
+    <a href="{{ url_for('home') }}" class="btn-nav">
+      <i class="fas fa-arrow-left"></i> Back to Search
+    </a>
+  </div>
+
+  {% if watchlist %}
+    <div class="watchlist-grid">
+      {% for item in watchlist %}
+        <div class="watchlist-card">
+          <div class="watchlist-stock-header">
+            <h3 class="watchlist-stock-name">{{ item.name }}</h3>
+            <span class="watchlist-stock-symbol">{{ item.symbol }}</span>
+          </div>
+          <div class="watchlist-stock-price">₹{{ item.current_price|round(2) }}</div>
+          <div class="watchlist-stock-meta">
+            <span>Added: {{ item.added_at|format_datetime("%b %d, %Y") }}</span>
+            <span>
+              <i class="fas fa-arrow-{% if item.change_percent >= 0 %}up text-green-500{% else %}down text-red-500{% endif %}"></i>
+              {{ item.change_percent|round(2) }}%
+            </span>
+          </div>
+          <div class="watchlist-actions">
+            <a href="{{ url_for('results', stock_symbol=item.symbol) }}" class="watchlist-btn add">
+              <i class="fas fa-chart-line"></i> Analyze
+            </a>
+            <button class="watchlist-btn remove" data-symbol="{{ item.symbol }}">
+              <i class="fas fa-trash-alt"></i> Remove
+            </button>
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="empty-watchlist">
+      <i class="fas fa-binoculars"></i>
+      <h3>Your watchlist is empty</h3>
+      <p>Add stocks to your watchlist to track them here</p>
+      <a href="{{ url_for('home') }}" class="btn-nav">
+        <i class="fas fa-search"></i> Browse Stocks
+      </a>
+    </div>
+  {% endif %}
+</div>
+
+<!-- Toast Notification Element -->
+<div id="watchlist-toast" class="watchlist-toast">
+  <i class="fas fa-check-circle"></i>
+  <span class="toast-message"></span>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    // Remove from watchlist functionality
+    document.querySelectorAll('.watchlist-btn.remove').forEach(btn => {
+      btn.addEventListener('click', async function() {
+        const symbol = this.dataset.symbol;
+        const card = this.closest('.watchlist-card');
+        const originalText = this.innerHTML;
+        
+        // Show loading state
+        this.classList.add('loading');
+        this.innerHTML = '';
+        
+        try {
+          const response = await fetch('/watchlist/remove', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/x-www-form-urlencoded',
+              'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').content
+            },
+            body: `stock_symbol=${symbol}`
+          });
+          
+          const data = await response.json();
+          
+          if (data.success) {
+            // Show success toast
+            showToast('Stock removed from watchlist', 'success');
+            
+            // Animate card removal
+            card.style.transition = 'all 0.3s ease';
+            card.style.opacity = '0';
+            card.style.transform = 'translateX(100px)';
+            
+            setTimeout(() => {
+              card.remove();
+              
+              // If no cards left, show empty state
+              if (document.querySelectorAll('.watchlist-card').length === 0) {
+                window.location.reload();
+              }
+            }, 300);
+          } else {
+            showToast(data.message || 'Error removing stock', 'error');
+            this.classList.remove('loading');
+            this.innerHTML = originalText;
+          }
+        } catch (error) {
+          console.error('Error removing from watchlist:', error);
+          showToast('Failed to remove from watchlist', 'error');
+          this.classList.remove('loading');
+          this.innerHTML = originalText;
+        }
+      });
+    });
+    
+    // Toast notification function
+    function showToast(message, type) {
+      const toast = document.getElementById('watchlist-toast');
+      const icon = toast.querySelector('i');
+      const messageEl = toast.querySelector('.toast-message');
+      
+      // Set content and style
+      messageEl.textContent = message;
+      toast.className = `watchlist-toast ${type}`;
+      
+      // Set icon based on type
+      if (type === 'success') {
+        icon.className = 'fas fa-check-circle';
+      } else {
+        icon.className = 'fas fa-exclamation-circle';
+      }
+      
+      // Show toast
+      toast.classList.add('show');
+      
+      // Hide after 3 seconds
+      setTimeout(() => {
+        toast.classList.remove('show');
+      }, 3000);
+    }
+  });
+</script>
+{% endblock %}

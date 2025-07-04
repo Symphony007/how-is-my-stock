@@ -1,0 +1,169 @@
+.cyberpunk-loader {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    display: none;
+    z-index: 9999;
+    background: radial-gradient(circle at center, #0f0f1a 0%, #090914 100%);
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    opacity: 0;
+    transition: opacity 0.2s ease-out;
+  }
+  
+  .cyberpunk-loader.active {
+    display: flex;
+    opacity: 1;
+  }
+  
+  .cyberpunk-loader.hide {
+    opacity: 0;
+  }
+  
+  .scanlines {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    background: repeating-linear-gradient(
+      0deg,
+      rgba(0, 255, 255, 0.03) 0px,
+      rgba(0, 255, 255, 0.03) 1px,
+      transparent 1px,
+      transparent 4px
+    );
+  }
+  
+  .loader-bars {
+    display: flex;
+    align-items: flex-end;
+    height: 120px;
+    gap: 8px;
+  }
+  
+  .bar {
+    width: 14px;
+    height: 100px;
+    border-radius: 2px;
+    transform-origin: bottom;
+    animation: 
+      barPulse 1.4s ease-in-out infinite,
+      colorShift 6s linear infinite;
+    box-shadow: 0 0 10px currentColor;
+  }
+  
+  .bar:nth-child(1) { animation-delay: 0.1s, 0s; }
+  .bar:nth-child(2) { animation-delay: 0.2s, 0.5s; }
+  .bar:nth-child(3) { animation-delay: 0.3s, 1s; }
+  .bar:nth-child(4) { animation-delay: 0.4s, 1.5s; }
+  .bar:nth-child(5) { animation-delay: 0.5s, 2s; }
+  
+  @keyframes barPulse {
+    0%, 100% { transform: scaleY(1); }
+    50% { transform: scaleY(0.3); }
+  }
+  
+  @keyframes colorShift {
+    0%   { color: #00fffc; }
+    20%  { color: #ff00ff; }
+    40%  { color: #7f00ff; }
+    60%  { color: #00ff9d; }
+    80%  { color: #ff5500; }
+    100% { color: #00fffc; }
+  }
+  
+  .analyzing-text {
+    margin-top: 40px;
+    font-size: 1.8rem;
+    font-weight: 700;
+    color: #00fffc;
+    letter-spacing: 3px;
+    font-family: 'Rajdhani', sans-serif;
+  }
+  
+  .glitch-text {
+    position: relative;
+    color: #00fff7;
+    text-shadow: 
+      0 0 2px #00fff7,
+      0 0 5px #00fff7,
+      0 0 10px rgba(0, 255, 247, 0.5);
+    animation: glitchFade 2.5s infinite;
+  }
+  
+  .glitch-text::before,
+  .glitch-text::after {
+    content: attr(data-text);
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    overflow: hidden;
+    color: #ff00ff;
+    z-index: -1;
+  }
+  
+  .glitch-text::before {
+    animation: glitchTop 2s infinite linear alternate-reverse;
+    color: #00ffff;
+  }
+  
+  .glitch-text::after {
+    animation: glitchBottom 1.8s infinite linear alternate-reverse;
+    color: #ff00ff;
+  }
+  
+  @keyframes glitchTop {
+    0% { clip-path: inset(0 0 80% 0); transform: translateX(-2px); }
+    10% { clip-path: inset(10% 0 70% 0); transform: translateX(2px); }
+    20% { clip-path: inset(20% 0 60% 0); transform: translateX(-1px); }
+    30% { clip-path: inset(0 0 80% 0); transform: translateX(3px); }
+    40% { clip-path: inset(30% 0 40% 0); transform: translateX(-3px); }
+    100% { clip-path: inset(0 0 80% 0); transform: translateX(1px); }
+  }
+  
+  @keyframes glitchBottom {
+    0% { clip-path: inset(80% 0 0 0); transform: translateX(2px); }
+    10% { clip-path: inset(70% 0 10% 0); transform: translateX(-2px); }
+    20% { clip-path: inset(60% 0 20% 0); transform: translateX(1px); }
+    30% { clip-path: inset(50% 0 30% 0); transform: translateX(-3px); }
+    40% { clip-path: inset(40% 0 40% 0); transform: translateX(3px); }
+    100% { clip-path: inset(80% 0 0 0); transform: translateX(-1px); }
+  }
+  
+  @keyframes glitchFade {
+    0%, 100% { opacity: 1; }
+    45% { opacity: 0.2; }
+    50% { opacity: 0.5; }
+    55% { opacity: 0.1; }
+    60% { opacity: 0.8; }
+    75% { opacity: 0.4; }
+  }
+  
+  .dynamic-dots::after {
+    content: '';
+    animation: dotSequence 1.5s infinite steps(4), dotColorShift 3s linear infinite;
+    display: inline-block;
+    width: 24px;
+    text-align: left;
+    color: #00fff7;
+    font-weight: bold;
+    text-shadow: 0 0 5px currentColor;
+  }
+  
+  @keyframes dotSequence {
+    0% { content: ''; }
+    25% { content: '.'; }
+    50% { content: '..'; }
+    75% { content: '...'; }
+  }
+  
+  @keyframes dotColorShift {
+    0%   { color: #00fff7; text-shadow: 0 0 5px #00fff7; }
+    25%  { color: #ff00ff; text-shadow: 0 0 5px #ff00ff; }
+    50%  { color: #00ffe1; text-shadow: 0 0 5px #00ffe1; }
+    75%  { color: #ff5500; text-shadow: 0 0 5px #ff5500; }
+    100% { color: #00fff7; text-shadow: 0 0 5px #00fff7; }
+  }

@@ -1,0 +1,30 @@
+# Python cache and compiled files
+__pycache__/
+*.py[cod]
+
+# Virtual environment
+venv/
+
+# Environment variables
+.env
+
+# VSCode settings
+.vscode/
+
+# SQLite database
+instance/
+*.db
+
+# Flask/Migration folders (if auto-generated)
+migrations/
+
+# Node modules (if ever used for frontend tooling)
+node_modules/
+
+# System files
+.DS_Store
+Thumbs.db
+
+# Logs and temp files
+*.log
+*.tmp

@@ -1,0 +1,145 @@
+{% extends "layout.html" %}
+
+{% block title %}How is my Stock?{% endblock %}
+
+{% block content %}
+<div id="cyberpunk-loader" class="cyberpunk-loader">
+  <div class="scanlines"></div>
+  <div class="loader-bars">
+    <div class="bar"></div>
+    <div class="bar"></div>
+    <div class="bar"></div>
+    <div class="bar"></div>
+    <div class="bar"></div>
+  </div>
+  <div class="analyzing-text">
+    <span class="glitch-text" data-text="ANALYZING">ANALYZING</span>
+    <span class="dynamic-dots"></span>
+  </div>
+</div>
+
+<div class="hero-box">
+  <h1>HOW IS MY STOCK?</h1>
+  <p>Get real-time insights and make informed investment decisions</p>
+</div>
+
+<div class="search-section">
+  <div class="search-container">
+    <input type="text" id="company-search" placeholder="Search by company name..." autocomplete="off" aria-label="Company search">
+    <div class="loading-indicator"></div>
+    <input type="hidden" id="stock-symbol" name="stock_symbol">
+    <button type="button" id="analyze-btn"><i class="fas fa-search"></i> Analyze</button>
+    <div id="custom-dropdown" class="custom-dropdown"></div>
+  </div>
+</div>
+
+<section class="objective-section fade-in">
+  <h2>Our Objective</h2>
+  <p>
+    <strong>How is my Stock?</strong> aims to bridge the gap between market sentiment and informed investing.
+    This platform is designed specifically for <strong>new traders and investors</strong> who often struggle with information overload.
+    By collecting real-time community sentiment and visualizing it simply, we help you make smarter decisions faster —
+    without needing to be a market expert.
+  </p>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  window.companyMap = {{ company_to_symbol|tojson }};
+  
+  document.addEventListener('DOMContentLoaded', function() {
+    const loader = document.getElementById('cyberpunk-loader');
+    loader.style.display = 'none';
+    
+    const companySearch = document.getElementById('company-search');
+    const stockSymbolInput = document.getElementById('stock-symbol');
+    const analyzeBtn = document.getElementById('analyze-btn');
+    const customDropdown = document.getElementById('custom-dropdown');
+    const loadingIndicator = document.querySelector('.loading-indicator');
+    
+    analyzeBtn.addEventListener('click', function(e) {
+      e.preventDefault();
+      
+      loader.style.display = 'flex';
+      void loader.offsetHeight;
+      loader.classList.add('active');
+      
+      const companyName = companySearch.value;
+      const symbol = stockSymbolInput.value;
+      
+      if (!companyName && !symbol) {
+        alert('Please select a company from the list');
+        loader.style.display = 'none';
+        loader.classList.remove('active');
+        return;
+      }
+      
+      requestAnimationFrame(() => {
+        setTimeout(() => {
+          if (symbol) {
+            window.location.href = `/results?stock_symbol=${symbol}`;
+          } else {
+            window.location.href = `/results?company_name=${encodeURIComponent(companyName)}`;
+          }
+        }, 50);
+      });
+    });
+
+    companySearch.addEventListener('input', async function() {
+      const query = this.value.trim();
+      customDropdown.innerHTML = '';
+      
+      if (query.length < 1) {
+        customDropdown.classList.remove('show');
+        loadingIndicator.style.display = 'none';
+        return;
+      }
+      
+      loadingIndicator.style.display = 'block';
+      customDropdown.classList.remove('show');
+      
+      try {
+        const filteredCompanies = Object.keys(window.companyMap).filter(company => 
+          company.toLowerCase().includes(query.toLowerCase())
+        );
+        
+        loadingIndicator.style.display = 'none';
+        
+        if (filteredCompanies.length > 0) {
+          filteredCompanies.forEach(company => {
+            const option = document.createElement('div');
+            option.className = 'dropdown-option';
+            option.innerHTML = `
+              <span class="company-name">${company}</span>
+              <span class="company-symbol">${window.companyMap[company]}</span>
+            `;
+            option.addEventListener('click', function() {
+              companySearch.value = company;
+              stockSymbolInput.value = window.companyMap[company];
+              customDropdown.classList.remove('show');
+            });
+            customDropdown.appendChild(option);
+          });
+          customDropdown.classList.add('show');
+        }
+      } catch (error) {
+        console.error('Search error:', error);
+        loadingIndicator.style.display = 'none';
+      }
+    });
+    
+    document.addEventListener('click', function(e) {
+      if (!companySearch.contains(e.target) && !customDropdown.contains(e.target)) {
+        customDropdown.classList.remove('show');
+      }
+    });
+    
+    companySearch.addEventListener('keypress', function(e) {
+      if (e.key === 'Enter') {
+        analyzeBtn.click();
+      }
+    });
+  });
+</script>
+{% endblock %}

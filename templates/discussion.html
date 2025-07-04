@@ -1,0 +1,357 @@
+<div class="forum-section" style="grid-column: span 2;">
+  <div class="card" style="height: 600px; display: flex; flex-direction: column;">
+    <div class="card-header">
+      <h2><i class="fas fa-comments"></i> Community Discussion</h2>
+    </div>
+
+    <div class="comment-form">
+      <textarea id="newComment" placeholder="Share your analysis on {{ stock_name }}..."></textarea>
+      <button id="postComment">
+        <i class="fas fa-paper-plane"></i> Post Comment
+      </button>
+    </div>
+
+    <div class="comments-section" id="commentsSection" style="overflow-y: auto; flex-grow: 1;">
+      <!-- Comments will be loaded here dynamically -->
+    </div>
+  </div>
+</div>
+
+<style>
+.forum-section {
+  margin-top: 20px;
+}
+
+.comment-form {
+  padding: 15px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  border-bottom: 1px solid rgba(167, 139, 250, 0.3);
+}
+
+.comment-form textarea {
+  min-height: 80px;
+  padding: 10px;
+  border-radius: 8px;
+  background: rgba(0,0,0,0.3);
+  border: 1px solid #a78bfa33;
+  color: white;
+  font-family: inherit;
+  resize: vertical;
+}
+
+.comment-form button {
+  align-self: flex-end;
+  background: linear-gradient(to bottom, #a78bfa, #8b5cf6);
+  color: white;
+  border: none;
+  padding: 8px 20px;
+  border-radius: 20px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-family: inherit;
+}
+
+.comment-form button:hover {
+  background: linear-gradient(to bottom, #8b5cf6, #7c3aed);
+  transform: translateY(-1px);
+}
+
+.comment-form button:active {
+  transform: translateY(1px);
+}
+
+.comments-section {
+  scrollbar-width: thin;
+  scrollbar-color: #8b5cf6 rgba(0,0,0,0.1);
+  padding: 15px;
+}
+
+.comments-section::-webkit-scrollbar {
+  width: 8px;
+}
+
+.comments-section::-webkit-scrollbar-thumb {
+  background-color: #8b5cf6;
+  border-radius: 4px;
+}
+
+.comment {
+  background: rgba(15, 15, 30, 0.7);
+  border-radius: 8px;
+  padding: 15px;
+  margin-bottom: 15px;
+  border-left: 3px solid #8b5cf6;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  transition: transform 0.2s ease;
+}
+
+.comment:hover {
+  transform: translateY(-2px);
+}
+
+.comment-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.user-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: #8b5cf6;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  flex-shrink: 0;
+}
+
+.user-info {
+  flex-grow: 1;
+  overflow: hidden;
+}
+
+.user-name {
+  font-weight: bold;
+  color: #e0e0ff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.comment-time {
+  font-size: 0.8rem;
+  color: #a78bfa;
+}
+
+.comment-content {
+  margin: 10px 0;
+  line-height: 1.5;
+  color: #e0e0ff;
+}
+
+.comment-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.like-btn, .reply-btn {
+  background: none;
+  border: none;
+  color: #a78bfa;
+  cursor: pointer;
+  font-size: 0.9rem;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 10px;
+  border-radius: 15px;
+  transition: all 0.2s ease;
+}
+
+.like-btn:hover, .reply-btn:hover {
+  background: rgba(167, 139, 250, 0.1);
+  color: #8b5cf6;
+}
+
+.sentiment-badge {
+  font-size: 0.7rem;
+  padding: 2px 8px;
+  border-radius: 10px;
+  margin-left: 10px;
+  font-weight: bold;
+}
+
+.sentiment-badge.bullish {
+  background: rgba(74, 222, 128, 0.2);
+  color: #4ade80;
+}
+
+.sentiment-badge.bearish {
+  background: rgba(248, 113, 113, 0.2);
+  color: #f87171;
+}
+
+.sentiment-badge.neutral {
+  background: rgba(167, 139, 250, 0.2);
+  color: #a78bfa;
+}
+
+.reply {
+  margin-left: 40px;
+  margin-top: 10px;
+  background: rgba(0,0,0,0.2);
+  border-left: 3px solid #a78bfa;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 40px 20px;
+  color: #a78bfa;
+}
+
+.empty-state i {
+  font-size: 2rem;
+  margin-bottom: 10px;
+  opacity: 0.7;
+}
+
+.empty-state h3 {
+  margin: 10px 0;
+  color: #e0e0ff;
+  font-weight: 500;
+}
+
+.empty-state p {
+  margin: 0;
+  opacity: 0.8;
+}
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const stockSymbol = '{{ stock_symbol }}';
+  let comments = [];
+  let mockComments = generateMockComments(); // Store mock comments separately
+
+  // Generate mock comments
+  function generateMockComments() {
+    const mockUsers = ['Ranjan Deb008', 'Shilpa_Rao', 'SK_Singhania', 'Keshav_yashV', 'Peter731'];
+    const mockComments = [
+      "What do you think about the recent earnings report?",
+      "I'm bullish on this stock long-term despite the recent dip.",
+      "The technical indicators suggest a potential breakout soon.",
+      "Management's guidance for next quarter looks promising.",
+      "I'm concerned about the increasing competition in this sector."
+    ];
+    
+    const mockSentiments = ['bullish', 'bearish', 'neutral'];
+    
+    return Array.from({length: 5}, (_, i) => ({
+      id: `mock-${i}`,
+      user_name: mockUsers[i % mockUsers.length],
+      content: mockComments[i % mockComments.length],
+      timestamp: new Date(Date.now() - (i * 3600000)).toISOString(),
+      likes: Math.floor(Math.random() * 20),
+      sentiment: mockSentiments[Math.floor(Math.random() * mockSentiments.length)],
+      replies: []
+    }));
+  }
+
+  // Fetch comments from backend
+  async function loadComments() {
+    try {
+      const response = await fetch(`/api/discussion/${stockSymbol}`);
+      if (response.ok) {
+        const realComments = await response.json();
+        // Combine real and mock comments, with real ones first
+        comments = [...realComments, ...mockComments];
+      } else {
+        // If API fails, use mock data only
+        comments = [...mockComments];
+      }
+      renderComments();
+    } catch (error) {
+      console.error("Failed to load comments, using mock data", error);
+      comments = [...mockComments];
+      renderComments();
+    }
+  }
+
+  // Render comments with user names
+  function renderComments() {
+    const commentsSection = document.getElementById('commentsSection');
+    
+    if (comments.length === 0) {
+      commentsSection.innerHTML = `
+        <div class="empty-state">
+          <i class="fas fa-comment-slash"></i>
+          <h3>No discussions yet</h3>
+          <p>Be the first to share your thoughts!</p>
+        </div>`;
+      return;
+    }
+
+    commentsSection.innerHTML = comments.map(comment => `
+      <div class="comment" id="comment-${comment.id}">
+        <div class="comment-header">
+          <div class="user-avatar">${comment.user_name.charAt(0)}</div>
+          <div class="user-info">
+            <div style="display: flex; align-items: center;">
+              <span class="user-name" title="${comment.user_name}">${comment.user_name}</span>
+              ${comment.sentiment ? `<span class="sentiment-badge ${comment.sentiment}">${comment.sentiment}</span>` : ''}
+            </div>
+            <span class="comment-time">${new Date(comment.timestamp).toLocaleString()}</span>
+          </div>
+        </div>
+        <div class="comment-content">${comment.content}</div>
+        <div class="comment-actions">
+          <button class="like-btn" data-comment-id="${comment.id}">
+            <i class="fas fa-thumbs-up"></i> ${comment.likes || 0}
+          </button>
+          ${comment.id.toString().startsWith('mock-') ? '' : `
+          <button class="reply-btn" data-comment-id="${comment.id}">
+            <i class="fas fa-reply"></i> Reply
+          </button>`}
+        </div>
+        ${comment.replies && comment.replies.length > 0 ? `
+        <div class="replies" id="replies-${comment.id}">
+          ${comment.replies.map(reply => `
+            <div class="comment reply" id="reply-${reply.id}">
+              <div class="comment-header">
+                <div class="user-avatar">${reply.user_name.charAt(0)}</div>
+                <div class="user-info">
+                  <span class="user-name">${reply.user_name}</span>
+                  <span class="comment-time">${new Date(reply.timestamp).toLocaleString()}</span>
+                </div>
+              </div>
+              <div class="comment-content">${reply.content}</div>
+              <div class="comment-actions">
+                <button class="like-btn" data-reply-id="${reply.id}">
+                  <i class="fas fa-thumbs-up"></i> ${reply.likes || 0}
+                </button>
+              </div>
+            </div>
+          `).join('')}
+        </div>` : ''}
+      </div>
+    `).join('');
+  }
+
+  // Post new comment
+  document.getElementById('postComment').addEventListener('click', async () => {
+    const content = document.getElementById('newComment').value.trim();
+    if (!content) return;
+
+    try {
+      const response = await fetch(`/api/discussion/${stockSymbol}`, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').content
+        },
+        body: JSON.stringify({ content })
+      });
+      
+      if (response.ok) {
+        document.getElementById('newComment').value = '';
+        loadComments(); // Refresh will now show new comment + preserved mock comments
+      } else {
+        alert('Failed to post comment');
+      }
+    } catch (error) {
+      console.error("Failed to post comment", error);
+      alert('Error posting comment');
+    }
+  });
+
+  // Initial load
+  loadComments();
+});
+</script>

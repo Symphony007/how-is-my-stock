@@ -1,0 +1,238 @@
+{% extends "layout.html" %}
+{% block content %}
+<!-- Profile Container -->
+<div class="profile-container">
+  <!-- Profile Header -->
+  <div class="profile-header">
+    <div class="avatar-initials">
+      {% if user.full_name %}
+        {% set names = user.full_name.split(' ') %}
+        {% for name in names %}
+          {{ name[0] }}
+        {% endfor %}
+      {% else %}
+        {{ user.username[0] }}
+      {% endif %}
+    </div>
+    <h1 class="profile-title">{{ user.full_name if user.full_name else user.username }}</h1>
+    <p class="profile-subtitle">Member since {{ user.created_at.strftime('%b %Y') }}</p>
+  </div>
+
+  <!-- Stats -->
+  <div class="profile-stats">
+    <div class="stat-item">
+      <div class="stat-number">{{ search_count }}</div>
+      <div class="stat-label">Searches</div>
+    </div>
+    <div class="stat-item">
+      <div class="stat-number">{{ vote_count }}</div>
+      <div class="stat-label">Votes</div>
+    </div>
+    <div class="stat-item">
+      <div class="stat-number">{{ watchlist_items|length }}</div>
+      <div class="stat-label">Watchlist</div>
+    </div>
+  </div>
+
+  <!-- Three Column Layout -->
+  <div class="profile-columns">
+    <!-- Account Settings Column -->
+    <div class="profile-column">
+      <h2 class="column-title"><i class="fas fa-user-cog"></i> Account Settings</h2>
+      <form method="POST" action="{{ url_for('update_profile') }}" class="profile-form">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="form-group">
+          <label for="full_name">Full Name</label>
+          <input type="text" id="full_name" name="full_name" value="{{ user.full_name if user.full_name else '' }}">
+        </div>
+        <div class="form-group">
+          <label for="email">Email</label>
+          <input type="email" id="email" name="email" value="{{ user.email if user.email else '' }}">
+        </div>
+        <div class="form-group checkbox-group">
+          <label>
+            <input type="checkbox" name="email_notifications" {% if user.notification_prefs.email %}checked{% endif %}>
+            Email Notifications
+          </label>
+          <label>
+            <input type="checkbox" name="app_notifications" {% if user.notification_prefs.app %}checked{% endif %}>
+            In-App Notifications
+          </label>
+        </div>
+        <button type="submit" class="btn-save">Save Changes</button>
+      </form>
+
+      <h3 class="sub-section-title">Change Password</h3>
+      <form method="POST" action="{{ url_for('change_password') }}" class="profile-form">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="form-group">
+          <label for="current_password">Current Password</label>
+          <input type="password" id="current_password" name="current_password" required>
+        </div>
+        <div class="form-group">
+          <label for="new_password">New Password</label>
+          <input type="password" id="new_password" name="new_password" required>
+        </div>
+        <div class="form-group">
+          <label for="confirm_password">Confirm Password</label>
+          <input type="password" id="confirm_password" name="confirm_password" required>
+        </div>
+        <button type="submit" class="btn-change-password">Change Password</button>
+      </form>
+    </div>
+
+    <!-- Watchlist Column -->
+    <div class="profile-column">
+      <div class="column-header">
+        <h2 class="column-title"><i class="fas fa-bookmark"></i> Watchlist</h2>
+        <a href="{{ url_for('get_watchlist') }}" class="view-all-link">View All</a>
+      </div>
+      
+      {% if watchlist_items %}
+      <div class="watchlist-items">
+        {% for item in watchlist_items %}
+        <div class="watchlist-item">
+          <div class="watchlist-item-content">
+            <a href="{{ url_for('results', stock_symbol=item.stock_symbol) }}" class="stock-link">
+              <span class="stock-symbol">{{ item.stock_symbol }}</span>
+              <span class="stock-name">{{ symbol_to_company.get(item.stock_symbol, item.stock_symbol) }}</span>
+            </a>
+            <div class="watchlist-item-meta">
+              <span class="stock-price">
+                ₹{{ stock_prices.get(item.stock_symbol)|round(2) if stock_prices.get(item.stock_symbol) is not none else 'N/A' }}
+              </span>
+              <button class="btn-remove watchlist-remove" data-symbol="{{ item.stock_symbol }}">
+                <i class="fas fa-trash-alt"></i>
+              </button>
+            </div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <div class="empty-watchlist">
+        <i class="fas fa-binoculars"></i>
+        <p>Your watchlist is empty</p>
+        <a href="{{ url_for('home') }}" class="btn-browse">Browse Stocks</a>
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- Activity Column -->
+    <div class="profile-column">
+      <h2 class="column-title"><i class="fas fa-chart-line"></i> Recent Activity</h2>
+      {% if recent_votes %}
+      <div class="activity-list">
+        {% for vote in recent_votes %}
+        <div class="activity-item">
+          <span class="activity-icon {{ 'vote-buy' if vote.vote == 'Buy' else 'vote-sell' if vote.vote == 'Sell' else 'vote-hold' }}">
+            <i class="fas fa-{{ 'thumbs-up' if vote.vote == 'Buy' else 'thumbs-down' if vote.vote == 'Sell' else 'hand-holding' }}"></i>
+          </span>
+          <div class="activity-details">
+            <span class="activity-action">Voted {{ vote.vote }} on</span>
+            <a href="{{ url_for('results', stock_symbol=vote.stock_symbol) }}" class="activity-stock">
+              {{ symbol_to_company.get(vote.stock_symbol, vote.stock_symbol) }}
+            </a>
+            <span class="activity-time">{{ vote.timestamp|format_datetime }}</span>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <div class="empty-activity">
+        <i class="fas fa-history"></i>
+        <p>No recent activity</p>
+      </div>
+      {% endif %}
+
+      {% if top_stocks %}
+      <h3 class="sub-section-title">Your Top Stocks</h3>
+      <div class="top-stocks">
+        {% for stock in top_stocks %}
+        <div class="top-stock-item">
+          <a href="{{ url_for('results', stock_symbol=stock.stock_symbol) }}" class="top-stock-link">
+            <span class="top-stock-symbol">{{ stock.stock_symbol }}</span>
+            <span class="top-stock-votes">{{ stock.vote_count }} votes</span>
+          </a>
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Bottom Back Button -->
+  <div class="bottom-back-button">
+    <a href="{{ url_for('home') }}" class="back-button">
+      <i class="fas fa-arrow-left"></i> Back to Home
+    </a>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Watchlist removal functionality
+document.querySelectorAll('.watchlist-remove').forEach(btn => {
+  btn.addEventListener('click', async function(e) {
+    e.preventDefault();
+    const symbol = this.dataset.symbol;
+    const itemElement = this.closest('.watchlist-item');
+    
+    // Add loading state
+    const icon = this.querySelector('i');
+    icon.classList.remove('fa-trash-alt');
+    icon.classList.add('fa-spinner', 'fa-spin');
+    
+    try {
+      const response = await fetch('/watchlist/remove', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'X-CSRFToken': document.querySelector('input[name="csrf_token"]').value
+        },
+        body: `stock_symbol=${symbol}`
+      });
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        // Remove the item from UI with animation
+        itemElement.style.opacity = '0';
+        setTimeout(() => itemElement.remove(), 300);
+        
+        // Update watchlist count in stats
+        const watchlistCount = document.querySelector('.stat-item:nth-child(3) .stat-number');
+        watchlistCount.textContent = parseInt(watchlistCount.textContent) - 1;
+        
+        // Show notification
+        showToast('Removed from watchlist');
+      } else {
+        alert(data.message);
+        resetButtonIcon(icon);
+      }
+    } catch (error) {
+      console.error('Error removing from watchlist:', error);
+      alert('Failed to remove from watchlist');
+      resetButtonIcon(icon);
+    }
+  });
+});
+
+function resetButtonIcon(icon) {
+  icon.classList.remove('fa-spinner', 'fa-spin');
+  icon.classList.add('fa-trash-alt');
+}
+
+function showToast(message) {
+  const toast = document.createElement('div');
+  toast.className = 'toast-notification';
+  toast.textContent = message;
+  document.body.appendChild(toast);
+  setTimeout(() => {
+    toast.classList.add('fade-out');
+    setTimeout(() => toast.remove(), 500);
+  }, 3000);
+}
+</script>
+{% endblock %}

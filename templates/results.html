@@ -1,0 +1,1274 @@
+{% extends "layout.html" %}
+{% block head %}
+{{ super() }}
+<meta name="csrf-token" content="{{ csrf_token() }}">
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.1/moment.min.js"></script>
+<script
+  src="https://cdnjs.cloudflare.com/ajax/libs/chartjs-adapter-moment/1.0.0/chartjs-adapter-moment.min.js"></script>
+{% endblock %}
+
+{% block title %}{{ stock_name|default("Stock Analysis") }}{% endblock %}
+
+{% block styles %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/results.css') }}">
+<style>
+  .dashboard-container {
+    max-width: 1600px;
+    margin: 0 auto;
+    padding: 20px;
+  }
+
+  .dashboard-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 25px;
+    margin: 25px 0;
+  }
+
+  .card {
+    width: 100%;
+    background: rgba(15, 15, 30, 0.7);
+    border-radius: 15px;
+    padding: 25px;
+    border: 1px solid #a78bfa33;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+    height: fit-content;
+  }
+
+  .card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 20px;
+    padding-bottom: 15px;
+    border-bottom: 1px solid rgba(167, 139, 250, 0.3);
+  }
+
+  .card-header h2 {
+    margin: 0;
+    font-size: 1.3rem;
+    color: #a78bfa;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .market-status {
+    font-size: 0.9rem;
+    padding: 5px 10px;
+    border-radius: 15px;
+    font-weight: bold;
+  }
+
+  .market-status.open {
+    background: rgba(74, 222, 128, 0.2);
+    color: #4ade80;
+  }
+
+  .market-status.closed {
+    background: rgba(248, 113, 113, 0.2);
+    color: #f87171;
+  }
+
+  .stock-header {
+    grid-column: 1 / -1;
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 25px;
+    background: rgba(10, 10, 25, 0.9);
+    border-radius: 15px;
+    margin-bottom: 25px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+  }
+
+  .stock-title {
+    font-size: 2.2rem;
+    margin: 0;
+    color: #a78bfa;
+    font-family: 'Orbitron', sans-serif;
+    letter-spacing: 1px;
+  }
+
+  .stock-meta {
+    display: flex;
+    gap: 15px;
+    margin-top: 10px;
+  }
+
+  .stock-symbol {
+    background: rgba(167, 139, 250, 0.2);
+    padding: 5px 12px;
+    border-radius: 15px;
+    font-weight: bold;
+  }
+
+  .stock-sector {
+    background: rgba(74, 222, 128, 0.1);
+    padding: 5px 12px;
+    border-radius: 15px;
+    color: #4ade80;
+  }
+
+  .price-container {
+    text-align: right;
+    min-width: 200px;
+  }
+
+  .current-price {
+    font-size: 2.8rem;
+    font-weight: bold;
+    font-family: 'Rajdhani', sans-serif;
+  }
+
+  .current-price.price-up {
+    color: #4ade80;
+  }
+
+  .current-price.price-down {
+    color: #f87171;
+  }
+
+  .current-price.price-neutral {
+    color: #a78bfa;
+  }
+
+  .price-meta {
+    display: flex;
+    gap: 15px;
+    margin-top: 8px;
+    font-size: 1rem;
+  }
+
+  .price-high {
+    color: #4ade80;
+  }
+
+  .price-low {
+    color: #f87171;
+  }
+
+  .chart-container {
+    height: 400px;
+    position: relative;
+    margin-top: 15px;
+  }
+
+  .chart-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+  }
+
+  .grid-2-col {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 15px;
+  }
+
+  .grid-item {
+    background: rgba(0, 0, 0, 0.3);
+    padding: 12px;
+    border-radius: 10px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .grid-label {
+    color: #c4b5fd;
+    font-size: 0.95rem;
+    margin-bottom: 5px;
+    display: block;
+  }
+
+  .grid-value {
+    color: #e0e0ff;
+    font-weight: bold;
+    font-size: 1.1rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .status-indicator {
+    font-size: 0.85rem;
+    display: block;
+    margin-top: 5px;
+  }
+
+  .status-indicator.positive {
+    color: #4ade80;
+  }
+
+  .status-indicator.negative {
+    color: #f87171;
+  }
+
+  .status-indicator.neutral {
+    color: #a78bfa;
+  }
+
+  .progress-bar {
+    height: 6px;
+    background: rgba(167, 139, 250, 0.2);
+    border-radius: 3px;
+    margin: 8px 0;
+  }
+
+  .progress-fill {
+    height: 100%;
+    border-radius: 3px;
+  }
+
+  .sentiment-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 15px;
+  }
+
+  .sentiment-gauge {
+    width: 100%;
+  }
+
+  .gauge-track {
+    width: 100%;
+    height: 10px;
+    background: rgba(167, 139, 250, 0.1);
+    border-radius: 5px;
+    margin: 15px 0;
+  }
+
+  .gauge-fill {
+    height: 100%;
+    border-radius: 5px;
+    background: linear-gradient(to right, #f87171, #a78bfa, #4ade80);
+  }
+
+  .sentiment-value {
+    font-size: 1.8rem;
+    font-weight: bold;
+    text-align: center;
+  }
+
+  .sentiment-value.positive {
+    color: #4ade80;
+  }
+
+  .sentiment-value.negative {
+    color: #f87171;
+  }
+
+  .sentiment-value.neutral {
+    color: #a78bfa;
+  }
+
+  .recommendation {
+    font-size: 1.8rem;
+    font-weight: bold;
+    text-align: center;
+    padding: 20px;
+    border-radius: 10px;
+    width: 100%;
+  }
+
+  .recommendation.strong-buy {
+    background: rgba(74, 222, 128, 0.2);
+    color: #4ade80;
+  }
+
+  .recommendation.buy {
+    background: rgba(74, 222, 128, 0.1);
+    color: #4ade80;
+  }
+
+  .recommendation.hold {
+    background: rgba(167, 139, 250, 0.1);
+    color: #a78bfa;
+  }
+
+  .recommendation.sell {
+    background: rgba(248, 113, 113, 0.1);
+    color: #f87171;
+  }
+
+  .recommendation.strong-sell {
+    background: rgba(248, 113, 113, 0.2);
+    color: #f87171;
+  }
+
+  .vote-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 15px;
+  }
+
+  .vote-bars {
+    display: flex;
+    justify-content: center;
+    align-items: flex-end;
+    height: 180px;
+    gap: 30px;
+    margin: 15px 0;
+  }
+
+  .vote-bar-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 60px;
+  }
+
+  .vote-bar {
+    width: 50px;
+    border-radius: 6px 6px 0 0;
+    position: relative;
+    transition: height 0.5s ease;
+    box-shadow: 0 -5px 10px rgba(0, 0, 0, 0.15);
+  }
+
+  .vote-bar.buy {
+    background: linear-gradient(to top, #4ade80, #22c55e);
+  }
+
+  .vote-bar.hold {
+    background: linear-gradient(to top, #a78bfa, #8b5cf6);
+  }
+
+  .vote-bar.sell {
+    background: linear-gradient(to top, #f87171, #ef4444);
+  }
+
+  .vote-count {
+    position: absolute;
+    top: -30px;
+    width: 100%;
+    text-align: center;
+    font-weight: bold;
+    color: white;
+    font-size: 1.1rem;
+    text-shadow: 0 0 5px rgba(0, 0, 0, 0.5);
+  }
+
+  .vote-label {
+    margin-top: 8px;
+    font-weight: bold;
+    color: #e0e0ff;
+    font-size: 1.1rem;
+  }
+
+  .vote-options {
+    display: flex;
+    justify-content: center;
+    gap: 15px;
+    margin-top: 20px;
+    width: 100%;
+  }
+
+  .vote-btn {
+    padding: 10px 20px;
+    border: none;
+    border-radius: 25px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-size: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+  }
+
+  .vote-btn:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.3);
+  }
+
+  .vote-btn.buy {
+    background: linear-gradient(to bottom, #4ade80, #22c55e);
+    color: white;
+  }
+
+  .vote-btn.hold {
+    background: linear-gradient(to bottom, #a78bfa, #8b5cf6);
+    color: white;
+  }
+
+  .vote-btn.sell {
+    background: linear-gradient(to bottom, #f87171, #ef4444);
+    color: white;
+  }
+
+  .news-container {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+  }
+
+  .news-card {
+    padding: 15px;
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 10px;
+    transition: all 0.3s ease;
+  }
+
+  .news-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+  }
+
+  .news-title {
+    color: #e0e0ff;
+    font-weight: 500;
+    text-decoration: none;
+    display: block;
+    margin-bottom: 8px;
+    font-size: 1.1rem;
+  }
+
+  .news-meta {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.9rem;
+    color: #c4b5fd;
+  }
+
+  .news-sentiment {
+    font-weight: bold;
+  }
+
+  .news-sentiment.positive {
+    color: #4ade80;
+  }
+
+  .news-sentiment.negative {
+    color: #f87171;
+  }
+
+  .institutional-container {
+    overflow-x: auto;
+  }
+
+  .fii-dii-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.95rem;
+    min-width: 600px;
+  }
+
+  .fii-dii-table th,
+  .fii-dii-table td {
+    padding: 12px;
+    text-align: center;
+    border-bottom: 1px solid #a78bfa33;
+  }
+
+  .fii-dii-table th {
+    background: rgba(167, 139, 250, 0.1);
+    color: #a78bfa;
+    font-weight: bold;
+  }
+
+  .fii-dii-table tr:hover {
+    background: rgba(167, 139, 250, 0.05);
+  }
+
+  .positive-net {
+    color: #4ade80;
+    font-weight: bold;
+  }
+
+  .negative-net {
+    color: #f87171;
+    font-weight: bold;
+  }
+
+  .action-buttons {
+    display: flex;
+    justify-content: center;
+    margin-top: 30px;
+    grid-column: 1 / -1;
+  }
+
+  .back-button {
+    background: linear-gradient(135deg, #a78bfa 0%, #8b5cf6 100%);
+    color: white;
+    border: none;
+    padding: 12px 25px;
+    border-radius: 25px;
+    font-size: 1rem;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .back-button:hover {
+    background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+    transform: translateY(-3px);
+    box-shadow: 0 6px 15px rgba(0, 0, 0, 0.3);
+  }
+
+  .no-data {
+    color: #a78bfa;
+    text-align: center;
+    padding: 30px;
+    background: rgba(15, 15, 30, 0.5);
+    border-radius: 10px;
+    margin: 20px 0;
+  }
+
+  .watchlist-actions {
+    margin-left: 20px;
+  }
+
+  .watchlist-btn {
+    background: linear-gradient(135deg, #a78bfa 0%, #8b5cf6 100%);
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 25px;
+    font-size: 0.9rem;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    white-space: nowrap;
+  }
+
+  .watchlist-btn:hover {
+    background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 15px rgba(0, 0, 0, 0.3);
+  }
+
+  .watchlist-btn.remove {
+    background: linear-gradient(135deg, #f87171 0%, #ef4444 100%);
+  }
+
+  .watchlist-btn.remove:hover {
+    background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+  }
+
+  @media (max-width: 1200px) {
+    .dashboard-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .card {
+      max-width: 100%;
+    }
+  }
+
+  @media (max-width: 768px) {
+    .stock-header {
+      flex-direction: column;
+      text-align: center;
+    }
+
+    .price-container {
+      text-align: center;
+      margin-top: 15px;
+    }
+
+    .grid-2-col {
+      grid-template-columns: 1fr;
+    }
+
+    .vote-options {
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .vote-btn {
+      width: 100%;
+      max-width: 200px;
+      justify-content: center;
+    }
+
+    .chart-container {
+      height: 350px;
+    }
+
+    .watchlist-actions {
+      margin: 15px 0 0 0;
+      width: 100%;
+    }
+
+    .watchlist-btn {
+      width: 100%;
+      justify-content: center;
+    }
+  }
+
+  @media (max-width: 480px) {
+    .card {
+      padding: 15px;
+    }
+
+    .stock-header {
+      padding: 15px;
+    }
+
+    .stock-title {
+      font-size: 1.8rem;
+    }
+
+    .current-price {
+      font-size: 2.2rem;
+    }
+
+    .vote-bars {
+      gap: 20px;
+      height: 150px;
+    }
+
+    .vote-bar {
+      width: 40px;
+    }
+
+    .vote-bar-container {
+      width: 50px;
+    }
+  }
+
+    {
+    % if emergency_mode %
+  }
+
+  .alert {
+    padding: 15px;
+    margin-bottom: 20px;
+    border-radius: 4px;
+  }
+
+  .alert-warning {
+    background-color: #fff3cd;
+    color: #856404;
+  }
+
+    {
+    % endif %
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div id="cyberpunk-loader" class="cyberpunk-loader">
+  <div class="scanlines"></div>
+  <div class="loader-bars">
+    <div class="bar"></div>
+    <div class="bar"></div>
+    <div class="bar"></div>
+    <div class="bar"></div>
+    <div class="bar"></div>
+  </div>
+  <div class="analyzing-text">
+    <span class="glitch-text" data-text="ANALYZING">ANALYZING</span>
+    <span class="dynamic-dots"></span>
+  </div>
+</div>
+
+<div class="dashboard-container">
+  {% if emergency_mode %}
+  <div class="alert alert-warning">
+    <i class="fas fa-exclamation-triangle"></i>
+    Showing cached data - some features limited
+  </div>
+  {% endif %}
+
+  <div id="chart-data" data-dates="{{ chart_data.times|tojson|forceescape }}"
+    data-prices="{{ chart_data.prices|tojson|forceescape }}" data-symbol="{{ stock_symbol|tojson|forceescape }}"
+    data-votes="{{ vote_counts|tojson|forceescape }}" data-type="{{ chart_type }}"
+    data-market-status="{{ 'open' if is_market_open else 'closed' }}" style="display:none;"></div>
+
+  <div class="stock-header">
+    <div class="stock-info">
+      <h1 class="stock-title">{{ stock_name }}</h1>
+      <div class="stock-meta">
+        <span class="stock-symbol">{{ stock_symbol }}</span>
+        {% if sector %}<span class="stock-sector">{{ sector }}</span>{% endif %}
+      </div>
+    </div>
+
+    <div class="watchlist-actions">
+      {% if 'user_id' in session %}
+      {% if stock_symbol in user_watchlist %}
+      <button class="watchlist-btn remove" data-symbol="{{ stock_symbol }}">
+        <i class="fas fa-eye-slash"></i> Remove from Watchlist
+      </button>
+      {% else %}
+      <button class="watchlist-btn add" data-symbol="{{ stock_symbol }}">
+        <i class="fas fa-eye"></i> Add to Watchlist
+      </button>
+      {% endif %}
+      {% else %}
+      <button class="watchlist-btn" onclick="window.location.href='{{ url_for('login') }}'">
+        <i class="fas fa-sign-in-alt"></i> Login to Add to Watchlist
+      </button>
+      {% endif %}
+    </div>
+
+    <div class="price-container">
+      <div
+        class="current-price {% if recommendation in ['Strong Buy', 'Buy'] %}price-up{% elif recommendation in ['Strong Sell', 'Sell'] %}price-down{% else %}price-neutral{% endif %}">
+        ₹{{ current_price }}
+      </div>
+      {% if day_high and day_low %}
+      <div class="price-meta">
+        <span class="price-high" title="Day High"><i class="fas fa-arrow-up"></i> ₹{{ day_high }}</span>
+        <span class="price-low" title="Day Low"><i class="fas fa-arrow-down"></i> ₹{{ day_low }}</span>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="dashboard-grid">
+    <!-- Row 1 -->
+    <div class="card">
+      <div class="card-header">
+        <h2><i class="fas fa-chart-line"></i> Price Chart</h2>
+        <span class="market-status {{ 'open' if is_market_open else 'closed' }}" id="market-status-badge">
+          {{ 'Market Open - Live Data' if is_market_open else 'Market Closed - Previous Session' }}
+        </span>
+      </div>
+      <div class="chart-container">
+        {% if chart_data and chart_data.prices and chart_data.times %}
+        <canvas id="stockChart"></canvas>
+        {% else %}
+        <div class="no-data">
+          <i class="fas fa-chart-line fa-2x"></i>
+          <p>Chart data not available</p>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <h2><i class="fas fa-chart-pie"></i> Fundamentals</h2>
+      </div>
+      <div class="grid-2-col">
+        <div class="grid-item">
+          <span class="grid-label">Market Cap</span>
+          <span class="grid-value">{{ technicals.market_cap if technicals.market_cap else 'N/A' }}</span>
+        </div>
+        <div class="grid-item">
+          <span class="grid-label">PE Ratio</span>
+          <span class="grid-value">{{ technicals.pe_ratio if technicals.pe_ratio else 'N/A' }}</span>
+        </div>
+        <div class="grid-item">
+          <span class="grid-label">52W High</span>
+          <span class="grid-value">₹{{ technicals.fifty_two_week_high if technicals.fifty_two_week_high else 'N/A'
+            }}</span>
+        </div>
+        <div class="grid-item">
+          <span class="grid-label">52W Low</span>
+          <span class="grid-value">₹{{ technicals.fifty_two_week_low if technicals.fifty_two_week_low else 'N/A'
+            }}</span>
+        </div>
+        <div class="grid-item">
+          <span class="grid-label">Dividend Yield</span>
+          <span class="grid-value">{{ technicals.dividend_yield if technicals.dividend_yield else 'N/A' }}</span>
+        </div>
+        <div class="grid-item">
+          <span class="grid-label">Beta</span>
+          <span class="grid-value">{{ technicals.beta if technicals.beta else 'N/A' }}</span>
+        </div>
+        <div class="grid-item">
+          <span class="grid-label">Sector</span>
+          <span class="grid-value">{{ technicals.sector if technicals.sector else 'N/A' }}</span>
+        </div>
+        <div class="grid-item">
+          <span class="grid-label">Industry</span>
+          <span class="grid-value">{{ technicals.industry if technicals.industry else 'N/A' }}</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Row 2 -->
+    <div class="card">
+      <div class="card-header">
+        <h2><i class="fas fa-chart-line"></i> Technical Indicators</h2>
+      </div>
+      <div class="grid-2-col">
+        <div class="grid-item">
+          <span class="grid-label">RSI (14)</span>
+          <span class="grid-value" id="rsi-value">N/A</span>
+          <div class="progress-bar">
+            <div class="progress-fill" id="rsi-bar"></div>
+          </div>
+          <span class="status-indicator" id="rsi-status">Loading...</span>
+        </div>
+        <div class="grid-item">
+          <span class="grid-label">MACD Crossover</span>
+          <span class="grid-value" id="macd-value">N/A</span>
+          <span class="status-indicator" id="macd-status">Loading...</span>
+        </div>
+        <div class="grid-item">
+          <span class="grid-label">Bollinger Bands</span>
+          <span class="grid-value" id="bollinger-value">N/A</span>
+          <span class="status-indicator" id="bollinger-status">Loading...</span>
+        </div>
+        <div class="grid-item">
+          <span class="grid-label">Key Levels</span>
+          <div>
+            <div>Support: <span id="support-level">N/A</span></div>
+            <div>Resistance: <span id="resistance-level">N/A</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <h2><i class="fas fa-chart-pie"></i> Market Sentiment</h2>
+      </div>
+      <div class="sentiment-container">
+        <div class="sentiment-gauge">
+          <div class="gauge-track">
+            <div class="gauge-fill" style="width: {{ ((sentiment_score + 1) * 50)|round(2) }}%"></div>
+          </div>
+          <div class="sentiment-value {{ avg_sentiment.lower() }}">{{ avg_sentiment }}</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Row 3 -->
+    <div class="card">
+      <div class="card-header">
+        <h2><i class="fas fa-institution"></i> Institutional Activity (FII/DII)</h2>
+      </div>
+      <div class="institutional-container">
+        <table class="fii-dii-table">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>FII Buy (₹ Cr)</th>
+              <th>FII Sell (₹ Cr)</th>
+              <th>FII Net</th>
+              <th>DII Buy (₹ Cr)</th>
+              <th>DII Sell (₹ Cr)</th>
+              <th>DII Net</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Month till date</td>
+              <td>151,866.52</td>
+              <td>131,858.11</td>
+              <td class="negative-net">-19,911.65 ↓</td>
+              <td>155,594.02</td>
+              <td>134,415.35</td>
+              <td class="positive-net">+2,111.66 ↑</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <h2>Community Sentiment</h2>
+      </div>
+      <div class="vote-container">
+        <div class="vote-bars">
+          <div class="vote-bar-container">
+            <div class="vote-bar buy"
+              style="height: {{ (vote_counts.Buy/total_votes*150 if total_votes > 0 else 50) }}px">
+              <div class="vote-count">{{ vote_counts.Buy }}</div>
+            </div>
+            <div class="vote-label">Buy</div>
+          </div>
+          <div class="vote-bar-container">
+            <div class="vote-bar hold"
+              style="height: {{ (vote_counts.Hold/total_votes*150 if total_votes > 0 else 50) }}px">
+              <div class="vote-count">{{ vote_counts.Hold }}</div>
+            </div>
+            <div class="vote-label">Hold</div>
+          </div>
+          <div class="vote-bar-container">
+            <div class="vote-bar sell"
+              style="height: {{ (vote_counts.Sell/total_votes*150 if total_votes > 0 else 50) }}px">
+              <div class="vote-count">{{ vote_counts.Sell }}</div>
+            </div>
+            <div class="vote-label">Sell</div>
+          </div>
+        </div>
+        <div class="vote-options">
+          <button class="vote-btn buy" onclick="castVote('Buy')">
+            <i class="fas fa-thumbs-up"></i> Buy
+          </button>
+          <button class="vote-btn hold" onclick="castVote('Hold')">
+            <i class="fas fa-hand-paper"></i> Hold
+          </button>
+          <button class="vote-btn sell" onclick="castVote('Sell')">
+            <i class="fas fa-thumbs-down"></i> Sell
+          </button>
+        </div>
+        <div id="vote-message" class="status-indicator neutral" style="margin-top: 15px;"></div>
+      </div>
+    </div>
+
+    <!-- Row 4 - Now contains both News and Discussion side by side -->
+    <div class="card">
+      <div class="card-header">
+        <h2><i class="fas fa-newspaper"></i> Latest News & Analysis</h2>
+      </div>
+      <div class="news-container">
+        {% if news %}
+          {% for article in news %}
+            {% if article %}
+              <div class="news-card">
+                <div class="news-source-badge">
+                  {% if article.source and article.source.name %}
+                    {% if article.source.name == 'NewsAPI' %}
+                      <i class="fas fa-newspaper"></i>
+                    {% elif article.source.name == 'AlphaVantage' %}
+                      <i class="fas fa-chart-line"></i>
+                    {% elif article.source.name == 'MoneyControl' %}
+                      <i class="fas fa-rupee-sign"></i>
+                    {% else %}
+                      <i class="fas fa-globe"></i>
+                    {% endif %}
+                    {{ article.source.name }}
+                  {% else %}
+                    <i class="fas fa-globe"></i> Unknown Source
+                  {% endif %}
+                </div>
+                <a href="{{ article.url|default('#') }}" target="_blank" class="news-title">
+                  {{ article.title|default('No title available') }}
+                </a>
+                <div class="news-meta">
+                  <span class="news-date">
+                    {{ article.publishedAt|format_datetime("%b %d, %Y") if article.publishedAt else 'Date unknown' }}
+                  </span>
+                  {% if sentiment_labels and loop.index0 < sentiment_labels|length %}
+                    <span class="news-sentiment {{ sentiment_labels[loop.index0].lower() if sentiment_labels[loop.index0] else '' }}">
+                      {{ sentiment_labels[loop.index0] }}
+                    </span>
+                  {% endif %}
+                </div>
+              </div>
+            {% endif %}
+          {% endfor %}
+        {% else %}
+          <div class="no-data">
+            <i class="fas fa-newspaper fa-2x"></i>
+            <p>No news articles available</p>
+          </div>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="card">  <!-- Discussion card now appears beside News -->
+      <div class="card-header">
+        <h2><i class="fas fa-comments"></i> Community Discussion</h2>
+      </div>
+      {% include 'discussion.html' %}
+    </div>
+
+    <div class="action-buttons">
+      <button onclick="window.location.href='{{ url_for('home') }}'" class="back-button">
+        <i class="fas fa-arrow-left"></i> Back to Home
+      </button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="{{ url_for('static', filename='js/results.js') }}"></script>
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    // Watchlist functionality
+    document.querySelectorAll('.watchlist-btn').forEach(btn => {
+      btn.addEventListener('click', async function () {
+        const symbol = this.dataset.symbol;
+        const isAdd = this.classList.contains('add');
+
+        try {
+          const response = await fetch(
+            isAdd ? '/watchlist/add' : '/watchlist/remove',
+            {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').content
+              },
+              body: `stock_symbol=${symbol}`
+            }
+          );
+
+          const data = await response.json();
+
+          if (data.success) {
+            // Update button state
+            if (isAdd) {
+              this.innerHTML = '<i class="fas fa-eye-slash"></i> Remove from Watchlist';
+              this.classList.remove('add');
+              this.classList.add('remove');
+            } else {
+              this.innerHTML = '<i class="fas fa-eye"></i> Add to Watchlist';
+              this.classList.remove('remove');
+              this.classList.add('add');
+            }
+
+            // Show success message
+            const toast = document.createElement('div');
+            toast.className = 'toast-message';
+            toast.textContent = data.message;
+            document.body.appendChild(toast);
+            setTimeout(() => toast.remove(), 3000);
+          } else {
+            alert(data.message);
+          }
+        } catch (error) {
+          console.error('Watchlist error:', error);
+          alert('Failed to update watchlist');
+        }
+      });
+    });
+
+    const loader = document.getElementById('cyberpunk-loader');
+    let startTime = Date.now();
+    const minDisplayTime = 1500;
+
+    if (loader) loader.classList.add('active');
+
+    const forms = document.querySelectorAll('form');
+    forms.forEach(form => {
+      form.addEventListener('submit', function () {
+        if (loader) loader.classList.add('active');
+      });
+    });
+
+    window.addEventListener('pageshow', function (event) {
+      if (event.persisted) {
+        if (loader) loader.classList.remove('active', 'hide');
+      }
+    });
+
+    window.addEventListener('load', function () {
+      const elapsed = Date.now() - startTime;
+      const remaining = Math.max(0, minDisplayTime - elapsed);
+
+      setTimeout(() => {
+        if (loader) {
+          loader.classList.add('hide');
+          setTimeout(() => {
+            loader.classList.remove('active', 'hide');
+          }, 1200);
+        }
+      }, remaining);
+    });
+
+    function initializeChart() {
+      try {
+        const chartElement = document.getElementById('stockChart');
+        if (!chartElement) return;
+
+        const ctx = chartElement.getContext('2d');
+        const chartDataElement = document.getElementById('chart-data');
+
+        if (!chartDataElement) return;
+
+        const chartData = JSON.parse(chartDataElement.dataset.prices || '[]');
+        const chartLabels = JSON.parse(chartDataElement.dataset.dates || '[]');
+        const chartType = chartDataElement.dataset.type;
+        const marketStatus = chartDataElement.dataset.marketStatus;
+
+        const marketStatusBadge = document.getElementById('market-status-badge');
+        if (marketStatusBadge) {
+          marketStatusBadge.textContent = marketStatus === 'open'
+            ? 'Market Open - Live Data'
+            : 'Market Closed - Previous Session';
+        }
+
+        if (chartData.length === 0 || chartLabels.length === 0) {
+          console.warn('No chart data available');
+          return;
+        }
+
+        new Chart(ctx, {
+          type: 'line',
+          data: {
+            labels: chartLabels,
+            datasets: [{
+              label: 'Stock Price',
+              data: chartData,
+              borderColor: '#8b5cf6',
+              backgroundColor: 'rgba(139, 92, 246, 0.1)',
+              borderWidth: 2,
+              fill: true,
+              tension: 0.1,
+              pointRadius: chartType === 'realtime' ? 0 : 2,
+              pointHoverRadius: chartType === 'realtime' ? 0 : 4
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: {
+                display: false
+              },
+              tooltip: {
+                mode: 'index',
+                intersect: false,
+                backgroundColor: 'rgba(30, 20, 60, 0.95)',
+                titleColor: '#e0e0ff',
+                bodyColor: '#e0e0ff',
+                borderColor: '#8b5cf6',
+                borderWidth: 1,
+                padding: 12,
+                callbacks: {
+                  label: function (context) {
+                    return 'Price: ₹' + context.parsed.y.toFixed(2);
+                  }
+                }
+              }
+            },
+            scales: {
+              x: {
+                grid: {
+                  color: 'rgba(167, 139, 250, 0.1)'
+                },
+                ticks: {
+                  color: '#c4b5fd'
+                }
+              },
+              y: {
+                grid: {
+                  color: 'rgba(167, 139, 250, 0.1)'
+                },
+                ticks: {
+                  color: '#c4b5fd',
+                  callback: function (value) {
+                    return '₹' + value;
+                  }
+                }
+              }
+            },
+            interaction: {
+              intersect: false,
+              mode: 'index'
+            }
+          }
+        });
+
+        if (chartType === 'realtime' && marketStatus === 'open') {
+          setInterval(fetchRealtimeData, 300000);
+        }
+      } catch (error) {
+        console.error('Chart initialization error:', error);
+      }
+    }
+
+    async function fetchRealtimeData() {
+      try {
+        const chartDataElement = document.getElementById('chart-data');
+        if (!chartDataElement) return;
+
+        const symbol = JSON.parse(chartDataElement.dataset.symbol);
+        const response = await fetch(`/realtime_data?symbol=${symbol}`);
+
+        if (response.ok) {
+          const newData = await response.json();
+          if (newData.times && newData.prices) {
+            chartDataElement.dataset.dates = JSON.stringify(newData.times);
+            chartDataElement.dataset.prices = JSON.stringify(newData.prices);
+            initializeChart();
+          }
+        }
+      } catch (error) {
+        console.error('Failed to fetch real-time data:', error);
+      }
+    }
+
+    async function loadTechnicalIndicators(symbol) {
+      try {
+        document.getElementById('rsi-value').textContent = 'N/A';
+        document.getElementById('macd-value').textContent = 'N/A';
+        document.getElementById('bollinger-value').textContent = 'N/A';
+        document.getElementById('support-level').textContent = 'N/A';
+        document.getElementById('resistance-level').textContent = 'N/A';
+
+        document.getElementById('rsi-status').textContent = 'Loading...';
+        document.getElementById('macd-status').textContent = 'Loading...';
+        document.getElementById('bollinger-status').textContent = 'Loading...';
+
+        const response = await fetch(`/api/technical_indicators/${symbol}`);
+        if (!response.ok) {
+          throw new Error('Failed to fetch technical indicators');
+        }
+
+        const data = await response.json();
+
+        if (data.status === 'success') {
+          if (data.rsi !== null && !isNaN(data.rsi)) {
+            const rsiValue = Math.round(data.rsi);
+            document.getElementById('rsi-value').textContent = rsiValue;
+            const rsiBar = document.getElementById('rsi-bar');
+            rsiBar.style.width = `${Math.min(100, Math.max(0, rsiValue))}%`;
+            rsiBar.style.background = rsiValue > 70 ? '#f87171' : rsiValue < 30 ? '#4ade80' : '#a78bfa';
+            document.getElementById('rsi-status').textContent =
+              rsiValue > 70 ? 'Overbought' : rsiValue < 30 ? 'Oversold' : 'Neutral';
+            document.getElementById('rsi-status').className =
+              `status-indicator ${rsiValue > 70 ? 'negative' : rsiValue < 30 ? 'positive' : 'neutral'}`;
+          } else {
+            document.getElementById('rsi-status').textContent = 'Data unavailable';
+          }
+
+          if (data.macd) {
+            document.getElementById('macd-value').textContent =
+              `MACD: ${data.macd.macd_line.toFixed(2)} | Signal: ${data.macd.signal_line.toFixed(2)}`;
+            document.getElementById('macd-status').textContent =
+              `Histogram: ${data.macd.histogram.toFixed(2)} (${data.macd.trend})`;
+            document.getElementById('macd-status').className =
+              `status-indicator ${data.macd.trend === 'bullish' ? 'positive' : 'negative'}`;
+          } else {
+            document.getElementById('macd-status').textContent = 'Data unavailable';
+          }
+
+          if (data.bollinger) {
+            document.getElementById('bollinger-value').textContent =
+              data.bollinger.price_position === 'upper' ? 'Upper Band' :
+                data.bollinger.price_position === 'lower' ? 'Lower Band' : 'Middle Band';
+            document.getElementById('bollinger-status').textContent =
+              `Upper: ${data.bollinger.upper.toFixed(2)} | Lower: ${data.bollinger.lower.toFixed(2)}`;
+          } else {
+            document.getElementById('bollinger-status').textContent = 'Data unavailable';
+          }
+
+          if (data.support && data.resistance) {
+            document.getElementById('support-level').textContent = data.support.toFixed(2);
+            document.getElementById('resistance-level').textContent = data.resistance.toFixed(2);
+          }
+        }
+      } catch (error) {
+        console.error('Error loading technical indicators:', error);
+        document.getElementById('rsi-status').textContent = 'Error loading data';
+        document.getElementById('macd-status').textContent = 'Error loading data';
+        document.getElementById('bollinger-status').textContent = 'Error loading data';
+      }
+    }
+
+    const stockSymbol = JSON.parse(document.getElementById('chart-data').dataset.symbol);
+    initializeChart();
+    loadTechnicalIndicators(stockSymbol);
+  });
+</script>
+{% endblock %}

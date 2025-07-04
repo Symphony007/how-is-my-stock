@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="csrf-token" content="{{ csrf_token() }}" />
+  <title>{% block title %}How is my Stock?{% endblock %}</title>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700&family=Rajdhani:wght@500;600&family=Exo+2:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/loader.css') }}" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/profile.css') }}" />
+  {% block styles %}{% endblock %}
+</head>
+<body class="{% if request.endpoint in ['home', 'index', 'login', 'register'] %}bg-image{% else %}bg-gradient{% endif %}">
+
+  <header>
+    <div class="logo"><i class="fas fa-chart-line"></i> How is my Stock?</div>
+    <nav class="nav-links">
+      {% if 'user_id' in session %}
+        <div class="profile-dropdown">
+          <button class="btn-nav profile-btn">
+            <i class="fas fa-user-circle"></i> Profile
+          </button>
+          <div class="dropdown-content">
+            <a href="{{ url_for('profile') }}"><i class="fas fa-user"></i> My Profile</a>
+            <a href="{{ url_for('logout') }}"><i class="fas fa-sign-out-alt"></i> Logout</a>
+          </div>
+        </div>
+      {% else %}
+        <a href="{{ url_for('login') }}" class="btn-nav"><i class="fas fa-sign-in-alt"></i> Login</a>
+        <a href="{{ url_for('register') }}" class="btn-nav"><i class="fas fa-user-plus"></i> Register</a>
+      {% endif %}
+    </nav>
+  </header>
+
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      {% for category, message in messages %}
+        <div class="flash-{{ category }}">{{ message }}</div>
+      {% endfor %}
+    {% endif %}
+  {% endwith %}
+
+  <main>
+    {% block content %}{% endblock %}
+  </main>
+
+  <footer>
+    <div class="footer-content">
+      <div class="social-icons">
+        <a href="https://github.com/Symphony007" aria-label="GitHub"><i class="fab fa-github"></i></a>
+        <a href="https://www.linkedin.com/in/deepmalya-mallick-62a321305/" aria-label="LinkedIn"><i class="fab fa-linkedin"></i></a>
+        <a href="mailto:mallickdeepmalya05@gmail.com" aria-label="Email"><i class="fas fa-envelope"></i></a>
+      </div>
+      <a href="#" class="creator-link" onclick="openModal()">Know the Creator</a>
+    </div>
+  </footer>
+
+  <!-- Loader -->
+  <div class="cyberpunk-loader" id="cyberpunk-loader">
+    <div class="scanlines"></div>
+    <div class="loader-bars">
+      <div class="bar"></div>
+      <div class="bar"></div>
+      <div class="bar"></div>
+      <div class="bar"></div>
+      <div class="bar"></div>
+    </div>
+    <div class="analyzing-text">
+      <span class="glitch-text" data-text="ANALYZING">ANALYZING</span><span class="dynamic-dots"></span>
+    </div>
+  </div>
+
+  <!-- Updated Creator Modal -->
+  <div id="creator-modal" class="modal">
+    <div class="modal-content">
+      <span class="close-btn" onclick="closeModal()">&times;</span>
+  
+      <!-- Profile picture using your existing pfp.jpg -->
+      <div class="creator-image-container">
+        <img src="{{ url_for('static', filename='images/pfp.png') }}" alt="Deepmalya Mallick" class="creator-image">
+      </div>
+  
+      <h2>Deepmalya Mallick</h2>
+      <p>
+        I built <strong><em>How is my Stock?</em></strong> because the market has feelings — and someone had to listen.
+      </p>
+  
+      <p>
+        Think of this as therapy for your portfolio — where charts meet chatter and sentiment swings harder than a meme
+        stock on Reddit.
+      </p>
+  
+      <p>
+        I write code, chase bugs, and occasionally pretend I'm a fintech oracle.
+      </p>
+  
+      <hr />
+  
+      <p><strong>🖥 GitHub:</strong> <a href="https://github.com/Symphony007" target="_blank">Symphony007</a></p>
+      <p><strong>💼 LinkedIn:</strong> <a href="https://www.linkedin.com/in/deepmalya-mallick-62a321305/"
+          target="_blank">Deepmalya Mallick</a></p>
+      <p><strong>📧 Email:</strong> <a href="mailto:mallickdeepmalya05@gmail.com">mallickdeepmalya05@gmail.com</a></p>
+  
+      <hr />
+  
+      <p style="font-size: 0.9em; color: #aaa;">
+        ⚠️ Side effects include FOMO, smarter trades, and talking to your stocks like they can hear you.
+      </p>
+    </div>
+  </div>
+
+  <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+  {% block scripts %}{% endblock %}
+</body>
+</html>
