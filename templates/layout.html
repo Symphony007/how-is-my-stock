@@ -10,6 +10,7 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}" />
   <link rel="stylesheet" href="{{ url_for('static', filename='css/loader.css') }}" />
   <link rel="stylesheet" href="{{ url_for('static', filename='css/profile.css') }}" />
+  <link rel="icon" href="{{ url_for('static', filename='images/favicon.ico') }}">
   {% block styles %}{% endblock %}
 </head>
 <body class="{% if request.endpoint in ['home', 'index', 'login', 'register'] %}bg-image{% else %}bg-gradient{% endif %}">
