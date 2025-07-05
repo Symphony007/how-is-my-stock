@@ -8,6 +8,7 @@ import requests
 import yfinance as yf
 import feedparser
 import random
+import gunicorn
 from datetime import datetime, timedelta
 from functools import lru_cache, wraps
 from bs4 import BeautifulSoup
@@ -32,7 +33,10 @@ load_dotenv()
 app = Flask(__name__)
 
 app.secret_key = os.getenv('SECRET_KEY', 'fallback_secret_key')
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///stocks.db'
+DATABASE_URL = os.getenv('DATABASE_URL', 'sqlite:///stocks.db')  # Uses SQLite locally, PostgreSQL on Render
+if DATABASE_URL.startswith("postgres://"):  # Fix for Render's PostgreSQL URL format
+    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+app.config['SQLALCHEMY_DATABASE_URI'] = DATABASE_URL
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {'pool_pre_ping': True, 'pool_recycle': 300}
 app.config['CACHE_TYPE'] = 'RedisCache'
