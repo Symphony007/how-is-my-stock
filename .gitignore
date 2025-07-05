@@ -15,9 +15,6 @@ venv/
 instance/
 *.db
 
-# Flask/Migration folders (if auto-generated)
-migrations/
-
 # Node modules (if ever used for frontend tooling)
 node_modules/
 
