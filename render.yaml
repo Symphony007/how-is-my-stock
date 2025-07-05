@@ -4,7 +4,6 @@ services:
     runtime: python
     buildCommand: |
       pip install -r requirements.txt
-      cp NSE_list.csv /opt/render/project/src/  # Ensures file is in deploy directory
       flask db init
       flask db migrate -m "Initial migration"
       flask db upgrade
