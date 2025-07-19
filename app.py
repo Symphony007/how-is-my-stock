@@ -27,7 +27,6 @@ from flask_wtf.csrf import CSRFProtect
 from concurrent.futures import ThreadPoolExecutor
 from sqlalchemy.exc import SQLAlchemyError
 from flask_migrate import Migrate
-from flask_talisman import Talisman
 from whitenoise import WhiteNoise
 import torch  # Added for transformers support
 

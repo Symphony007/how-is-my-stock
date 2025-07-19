@@ -23,3 +23,5 @@ transformers
 werkzeug
 whitenoise
 yfinance
+flask-talisman
+alembic
