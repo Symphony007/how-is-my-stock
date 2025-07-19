@@ -88,11 +88,14 @@ FINNHUB_KEY = os.getenv('FINNHUB_KEY', 'fallback_finnhub_key')
 required_vars = ['SECRET_KEY', 'NEWSAPI_KEY']
 missing_vars = [var for var in required_vars if not os.getenv(var)]
 
-if missing_vars and not app.debug:
-    raise RuntimeError(
-        f"Missing required environment variables: {', '.join(missing_vars)}. "
-        "Please set these in your Railway environment variables."
-    )
+# Replace the strict validation with this
+if not app.debug:
+    missing_vars = [var for var in ['SECRET_KEY', 'NEWSAPI_KEY'] if not os.getenv(var)]
+    if missing_vars:
+        app.logger.warning(f"Missing recommended variables: {', '.join(missing_vars)}")
+        # Don't raise error for db migrations
+        if 'db' not in sys.argv:
+            raise RuntimeError(f"Missing required variables: {', '.join(missing_vars)}")
 
 NEWS_SOURCES = {
     "primary": [
