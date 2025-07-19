@@ -27,34 +27,73 @@ from flask_wtf.csrf import CSRFProtect
 from concurrent.futures import ThreadPoolExecutor
 from sqlalchemy.exc import SQLAlchemyError
 from flask_migrate import Migrate
+from flask_talisman import Talisman
+from whitenoise import WhiteNoise
 import torch  # Added for transformers support
 
 load_dotenv()
 app = Flask(__name__)
 
+csrf = CSRFProtect(app)
+app.config['WTF_CSRF_TIME_LIMIT'] = 3600  # CSRF token expires in 1 hour
+@app.after_request
+def apply_security_headers(response):
+    """Add security headers to every response"""
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+    response.headers['X-Frame-Options'] = 'SAMEORIGIN'
+    response.headers['X-XSS-Protection'] = '1; mode=block'
+    if 'Cache-Control' not in response.headers:
+        response.headers['Cache-Control'] = 'no-store, max-age=0'
+    return response
+
 app.secret_key = os.getenv('SECRET_KEY', 'fallback_secret_key')
-DATABASE_URL = os.getenv('DATABASE_URL', 'sqlite:///stocks.db')  # Uses SQLite locally, PostgreSQL on Render
-if DATABASE_URL.startswith("postgres://"):  # Fix for Render's PostgreSQL URL format
+# Improved database configuration with connection pooling
+DATABASE_URL = os.getenv('DATABASE_URL')
+if DATABASE_URL and DATABASE_URL.startswith("postgres://"):
     DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
-app.config['SQLALCHEMY_DATABASE_URI'] = DATABASE_URL
+
+app.config['SQLALCHEMY_DATABASE_URI'] = DATABASE_URL or 'sqlite:///stocks.db'
+app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+    'pool_size': 5,
+    'max_overflow': 10,
+    'pool_pre_ping': True,
+    'pool_recycle': 300  # Recycle connections after 5 minutes
+}
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {'pool_pre_ping': True, 'pool_recycle': 300}
+redis_url = os.getenv('REDIS_URL', 'redis://localhost:6379/0')
 app.config['CACHE_TYPE'] = 'RedisCache'
-app.config['CACHE_REDIS_URL'] = os.getenv('REDIS_URL', 'redis://localhost:6379/0')
+app.config['CACHE_REDIS_URL'] = redis_url
+app.config['CACHE_DEFAULT_TIMEOUT'] = 300  # 5 minutes
+app.config['CACHE_KEY_PREFIX'] = 'howismystock_'
 
 cache = Cache(app)
 db = SQLAlchemy(app)
 migrate = Migrate(app, db)
-csrf = CSRFProtect(app)  # Now properly initialized
 CORS(app)
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
+app.wsgi_app = WhiteNoise(app.wsgi_app, root='static/')
+app.wsgi_app.add_files('static/css/', prefix='css/')
+app.wsgi_app.add_files('static/js/', prefix='js/')
+app.wsgi_app.add_files('static/images/', prefix='images/')
+
 newsapi = NewsApiClient(api_key=os.getenv('NEWSAPI_KEY', 'fallback_newsapi_key'))
 ALPHA_VANTAGE_KEY = os.getenv('ALPHA_VANTAGE_KEY', 'fallback_alpha_vantage_key')
 FINNHUB_KEY = os.getenv('FINNHUB_KEY', 'fallback_finnhub_key')
+
+# ===== ENVIRONMENT VALIDATION =====
+required_vars = ['SECRET_KEY', 'NEWSAPI_KEY']
+missing_vars = [var for var in required_vars if not os.getenv(var)]
+
+if missing_vars and not app.debug:
+    raise RuntimeError(
+        f"Missing required environment variables: {', '.join(missing_vars)}. "
+        "Please set these in your Railway environment variables."
+    )
 
 NEWS_SOURCES = {
     "primary": [
@@ -595,25 +634,49 @@ def analyze_sentiment(text):
 
 def populate_initial_data():
     with app.app_context():
-        if Stock.query.count() == 0 and stock_list:
-            for stock in stock_list[:50]:
-                try:
+        try:
+            if Stock.query.count() == 0 and stock_list:
+                app.logger.info("Populating initial stock data...")
+                
+                # Batch insert for better performance
+                stocks_to_add = []
+                for stock in stock_list[:100]:  # Limit to 100 initially
                     if not Stock.query.filter_by(symbol=stock['SYMBOL']).first():
-                        yf_stock = yf.Ticker(stock['SYMBOL'] + ".NS")
-                        info = yf_stock.info
-                        db.session.add(Stock(
-                            symbol=stock['SYMBOL'],
-                            name=stock['NAME OF COMPANY'],
-                            current_price=info.get('currentPrice', 0),
-                            market_cap=info.get('marketCap', 0),
-                            pe_ratio=info.get('trailingPE', 0),
-                            dividend_yield=info.get('dividendYield', 0),
-                            sector=info.get('sector', 'N/A'),
-                            industry=info.get('industry', 'N/A')
-                        ))
-                except Exception as e:
-                    logger.error(f"Error adding stock {stock.get('SYMBOL', 'UNKNOWN')}: {e}")
-            db.session.commit()
+                        try:
+                            yf_stock = yf.Ticker(stock['SYMBOL'] + ".NS")
+                            info = yf_stock.info
+                            
+                            stocks_to_add.append(Stock(
+                                symbol=stock['SYMBOL'],
+                                name=stock['NAME OF COMPANY'],
+                                current_price=info.get('currentPrice', 0),
+                                market_cap=info.get('marketCap', 0),
+                                pe_ratio=info.get('trailingPE', 0),
+                                dividend_yield=info.get('dividendYield', 0),
+                                sector=info.get('sector', 'N/A'),
+                                industry=info.get('industry', 'N/A')
+                            ))
+                            
+                            # Commit in batches of 20
+                            if len(stocks_to_add) >= 20:
+                                db.session.bulk_save_objects(stocks_to_add)
+                                db.session.commit()
+                                stocks_to_add = []
+                                
+                        except Exception as e:
+                            app.logger.error(f"Error adding stock {stock.get('SYMBOL', 'UNKNOWN')}: {e}")
+                            continue
+                
+                # Add any remaining stocks
+                if stocks_to_add:
+                    db.session.bulk_save_objects(stocks_to_add)
+                    db.session.commit()
+                    
+                app.logger.info(f"Added {Stock.query.count()} stocks to database")
+                
+        except Exception as e:
+            app.logger.error(f"Error in populate_initial_data: {e}")
+            db.session.rollback()
 
 @app.context_processor
 def utility_processor():
@@ -1472,6 +1535,24 @@ def change_password():
         flash('Password changed successfully', 'success')
     return redirect(url_for('profile'))
 
+@app.route('/health')
+def health_check():
+    """Endpoint for health checks"""
+    try:
+        # Test database connection
+        db.session.execute(db.select(1)).scalar()
+        return jsonify({
+            'status': 'healthy',
+            'database': 'connected',
+            'timestamp': datetime.utcnow().isoformat()
+        }), 200
+    except Exception as e:
+        return jsonify({
+            'status': 'unhealthy',
+            'error': str(e),
+            'timestamp': datetime.utcnow().isoformat()
+        }), 500
+
 @app.after_request
 def add_header(response):
     response.cache_control.no_store = True
@@ -1573,19 +1654,35 @@ with app.app_context():
     db.create_all()
     populate_initial_data()
 
+# ===== APPLICATION INITIALIZATION =====
+def initialize_app():
+    """Initialize all application components"""
+    with app.app_context():
+        # Create tables if they don't exist
+        db.create_all()
+        
+        # Populate initial data
+        populate_initial_data()
+        
+        # Verify essential services
+        verify_services()
+
+def verify_services():
+    """Verify all external services are reachable"""
+    services = {
+        'NewsAPI': lambda: NewsApiClient(api_key=os.getenv('NEWSAPI_KEY')).get_sources(),
+        'Yahoo Finance': lambda: yf.Ticker("RELIANCE.NS").info,
+        'Database': lambda: db.session.execute(db.select(1)).scalar()
+    }
+    
+    for name, test in services.items():
+        try:
+            test()
+            app.logger.info(f"{name} service verified")
+        except Exception as e:
+            app.logger.error(f"{name} service check failed: {str(e)}")
+
 if __name__ == '__main__':
-    try:
-        print("\n=== Starting Application ===")
-        print(f"Python version: {sys.version}")
-        print(f"Working directory: {os.getcwd()}")
-        with app.app_context():
-            db.create_all()
-            populate_initial_data()
-        print("\n=== Starting Flask Server ===")
-        app.run(debug=True, host='0.0.0.0', port=5000, use_reloader=False, threaded=True)
-    except Exception as e:
-        print(f"\n!!! Application failed to start: {e} !!!")
-        import traceback
-        traceback.print_exc()
-    finally:
-        print("\n=== Application stopped ===")
+    initialize_app()
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host='0.0.0.0', port=port, threaded=True)
